@@ -1,0 +1,70 @@
+Jenkins执行机测试目录介绍
+ 
+ 
+ 
+ArchivedTestResult:历史构建的日志文件归档路径
+${version}：最后一次构建文件存放路径
+TestReport：用例日志存放路径
+TestReportFailed：失败用例日志的存放路径
+clusterLogConf：集群服务端和客户端日志存放路径
+cluster_top：获取到的到的ip，及集群安装topo
+runtimeLog：ant集群的安装日志（集群安装或者启动失败时需要查看）
+
+TestResult:最后一次构建用例日志
+Release:版本全量包存放路径
+Scripts：ant集群安装脚本存放路径
+DataSightBasePlatform_JAR：测试用例代码和调度代码jar包存放路径
+DataSightBasePlatform_NodeSchedule：节点调度源码存放路径
+DataSightBasePlatform_Schedule：用例调度源码存放路径
+DataSightBasePlatform_TestCode_HQ：测试用例源码存放路径
+DataSightBasePlatform_lib：CI 依赖包存放路径
+CI_Build:CI适配ant脚本存放路径
+
+测试CI 工作流程：
+首先会运行compile.xml脚本中的相关target，流程如下
+	copy_release：从开发的机器上取全量包，替换Release目录下的版本全量包
+取包地址在jenkins页面Execute shell配置-DRelease.path=
+ant -f compile.xml -DRelease.path=root:huawei@10.162.207.56:/usr1/V1R2C30-RELEASE/V100R002C30/*
+
+	replace.lib：替换测试代码依赖的版本jar包
+当触发CI 工程时，在compile.xml 中会把DataSightBasePlatform_lib/Version中的jar删掉，重新从版本包中取依赖的jar
+
+	compile.HQ.test.code：编译测试用例代码
+编译源码目录为DataSightBasePlatform_TestCode_HQ/
+
+	prepare.HQ.test.code.jar：把编译好的.class文件打成jar包
+放置的目录为DataSightBasePlatform_JAR/Hadoop_HQ_Test_Code.jar
+
+	compile.schedule.code：编译用例调度代码
+编译源码的路径为DataSightBasePlatform_Schedule/
+
+	prepare.schedule.code.jar：把编译好的.class文件打成jar包
+放置的路径为DataSightBasePlatform_JAR/Hadoop_Schedule_Code.jar
+运行DataSightBasePlatform_build.xml脚本中的相关target，流程如下
+	OccupyNodes:获取节点
+当工程获取到一台节点后，会在节点的在/opt下建立目录、文件/opt/nodeUsing/ projectList，文件里面的内容是获取到这台节点的CI工程名称
+
+	runAll：主要做的事情如下
+    install.nfs:网络文件系统安装
+把jenkins执行机的workspace目录作为磁盘挂载到各个节点上，进行文件从jenkins执行机到CI 机器上的拷贝
+
+清除获取到机器的环境：ant -f CI_env_setup.xml
+clear.cluster清除集群的java进程，ant -f CI_env_setup.xml
+clear.opt清除集群的安装目录
+
+部署集群：ant -f remote_ha.xml 安装服务端，ant -f remote_ha.xml install.client
+
+安装客户端：ant -f remote_ha.xml install.client
+ 
+启动集群：ant -f remote_ha.xml startup.cluster
+
+集群健康检查
+
+跑测试用例
+
+CI机器环境清理：ant -f CI_env_setup.xml clear.cluster
+ant -f CI_env_setup.xml clear.opt
+
+日志收集：archiveTestResult
+
+	ReleaseNodes：释放节点，删除节点tag  /opt/nodeUsing
