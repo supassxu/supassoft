@@ -1,0 +1,1009 @@
+工作中一直用的是junit，近期研究了一下TestNg，发现TestNg比java强大太多。
+　　TestNg简介
+　　TestNg也是一套测试框架，它的灵感来源于junit(java的单元测试框架)和nunit(.net的单元测试框架)。但是它又在此基础上引入了新的东西，使得它更加强大。
+　　TestNg表示下一代(next genaration)，它不仅可以做单元测试，还可以做集成测试
+　　安装eclipse插件：
+　　在eclipse- Help-Install new SoftWare-Add 输入链接http://beust.com/eclipse/ 一路next即可
+　　TestNg优于Junit的地方：
+　　1.允许分组测试
+　　@Test(groups="group1")
+　　public void groupTest(){
+　　}
+　　然后在testng.xml中定义要包含哪些group，不包含哪些group
+　　2.TestNg允许只运行失败的例子
+　　执行完testng后，会在test-output目录下生成一些测试结果文件。如果此次测试有失败的例子，我们调试完，想再运行一下这些失败的例子时，可以运行testng-failed.xml文件。这个文件就是记录了上一次所有执行失败的例子。是不是很方便啊。
+　　3.TestNg允许依赖测试（类似于ant的依赖）：
+　　可依赖测试方法：
+　　@Test(dependsOnMethods = { "test2" })
+　　public void test1() {
+　　}
+　　@Test
+　　public void test2() {
+　　}
+　　也可依赖群组：
+　　@Test(groups = { "init.1" })
+　　public void test1() {
+　　}
+　　@Test(groups = { "init.2" })
+　　public void test2() {
+　　}
+　　@Test(dependsOnGroups = { "init.*" })
+　　public void test2() {
+　　}
+　　4.TestNg支持并行测试（支持测试方法(methods)，测试类(classes)，小的测试套件（tests），可以大大提高测试效率
+　　在testng.xml文件中定义线程的个数：
+<suite name="Test-class Suite" parallel="classes" thread-count="2" >
+<test name="Test-class test" >
+<classes>
+<class name="class1" />
+<class name="class2" />
+</classes>
+</test>
+</suite>
+　　则开了两个线程一个运行class1，一个运行class2。
+　　5.标签比junit丰富:
+ 
+　　6.testng被@BeforeClass 和@AfterClass注释的方法可以不写成static方法
+　　7.被@Test标记的方法可以有输入参数，而在junit中是不行的
+import org.testng.annotations.Parameters;
+import org.testng.annotations.Test;
+public class ParameterizedTest1 {
+@Test
+@Parameters("myName")
+public void parameterTest(String myName) {
+System.out.println("Parameterized value is : " + myName);
+}
+}
+　　在testng.xml文件中定义参数的值
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE suite SYSTEM "http://testng.org/testng-1.0.dtd" >
+<suite name="Suite1">
+<test name="test1">
+<parameter name="myName" value="qiuqiu"/>
+<classes>
+<class name="ParameterizedTest1" />
+</classes>
+</test>
+</suite>
+　　可在<suite>标签或<test>标签下声明了参数。如果两个参数同名，在<test>标签下定义的参数优先
+　　8.testNg可以通过标注的方式来顺序执行
+　　@Test(priority=0)
+priority为0,1,2,3这样定义，然后就会按照数字从小到大那样依次执行
+
+相同点：
+　　1.都可以做忽略测试，可以忽略某个测试方法(在方法上面注释)，也可以忽略某个测试类(在类的上面注释)
+　　testNg：
+　　@Test(enabled = false)
+　　Junit：
+　　@Ingore
+　　@Test
+　　2.都支持数据驱动测试，只是用法不一样
+　　testng中可以用@DataProvider，参数化是在测试级别的，不需要通过构造函数来传递参数，它会自动映射。
+举例：
+//表示这个方法将提供数据给任何声明它的data provider名为“test1”的测试方法中
+@DataProvider(name = "test1")
+public Object[][] createData1() {
+return new Object[][] {
+{ "Cedric", new Integer(36) },
+{ "Anne", new Integer(37)},
+};
+}
+//下面这个方法将要调用名为test1的data provider提供的数据
+@Test(dataProvider="test1")
+public void verifyDta(String n1,Integer n2){
+System.out.println(n1 + " " + n2);
+}
+　　需要注意的是@Test(dataProvider=)和@DataProvider(name=)可以在同一个类中，使用方法就如上；如果不在同一个类中，那么必须把@DataProvider(name=)所在的类的这个方法定义成static静态方法。
+　　并且在@Test使用的时候需要制定类。用法就是@Test(dataProvider="",dataProviderClass=（@DataProvider所在的类）.class)
+　　而在junit中就麻烦多了。junit中的参数化是在类级别的，需要通过构造函数来传递参数。
+　　如下：
+　　package demo;
+　　public class Try {
+　　public  int result=3;
+　　public  int add(int n) {
+　　result += n;
+　　return result;
+　　}
+　　}
+测试代码：
+package demo;
+import static org.junit.Assert.assertEquals;
+import java.util.Arrays;
+import java.util.Collection;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
+//步骤1.指定特殊的运行器Parameterized.class
+@RunWith(Parameterized.class)
+public class TryTest {
+// 步骤2：为测试类声明几个变量，分别用于存放期望值和测试所用数据。此处我只放了测试所有数据，没放期望值。
+private int param, result;
+// 步骤3：申明构造函数
+public TryTest(int param, int result) {
+super();
+this.param = param;
+this.result = result;
+}
+// 步骤4：定义测试数据的集合,该方法可以任意命名
+// 但是必须使用@Parameters标注进行修饰
+// 这个方法的框架就不予解释了，大家只需要注意其中的数据，是一个二维数组，数据两两一组
+// 每组中的这两个数据，一个是参数，一个是你预期的结果。
+// 比如我们的第一组{4, 7}，4就是参数，7就是预期的结果。分别对应上面构造函数的param和result
+@Parameters
+public static Collection<Object[]> testDate() {
+Object[][] object = { { 1, 4 }, { 3, 6 }, { 1, 3 } };
+return Arrays.asList(object);
+}
+// 步骤5：编写测试方法，使用定义的变量作为参数进行测试
+// 这里的编写方法和以前的测试方法一样
+@Test
+public void testAdd() {
+Try test = new Try();
+assertEquals(result, test.add(param));
+}
+}
+　　3.超时测试，就是在规定时间内如果没有测试完成，就认定测试失败
+　　@Test(timeout=100)
+　　4.异常测试，就是在运行这个单元测试的时候应该要捕获到指定的异常，才算测试成功
+
+
+
+
+
+
+
+
+
+JUnit 4 与 TestNG 对比JUnit 4 与 TestNG 对比
+这两天在看一本书《Java测试新技术TestNG和高级概念》， 作者是 TestNG 的创始人，了解了不少关于 TestNG 的知识，看了一篇文章基本把这本书的几个观点都体现了，那我就直接翻译原文就好，省得自己总结。这两天要不是等原作者的授权的话可能周末本文就发布了，没 经过人家许可翻译人家文章应该的确也不是什么光彩的事情，等等无妨。原文链接JUnit 4 Vs TestNG – Comparison，非常感谢作者写出好文，不过mkyong先生写了的确好多文章，经常搜个文章 google 第一篇总是他的。如果有翻译问题，请拍砖。
+————————————————————————————————————————————
+Junit 4 和 TestNG 都是 Java 方面非常流行的单元测试框架。在功能上两个框架都非常类似。到底哪个比较好？在Java项目中我们应该选择哪个框架？
+下图将会对Junit 4 和 TestNG 做个功能特征的对比。
+ 
+1.1	注解支持
+Junit 4 和 TestNG 在注解方面的实现非常相似。
+特性	JUnit 4	TestNG
+测试注解	@Test	@Test
+测试套件在执行之前需要执行的	–	@BeforeSuite
+测试套件在执行之后需要执行的	–	@AfterSuite
+在测试之前需要执行的	–	@BeforeTest
+在测试之后需要执行的	–	@AfterTest
+在一个测试方法所属于的任意一个组的第一个方法被调用之前执行	–	@BeforeGroups
+在一个测试方法所属于的任意一个组的最后一个方法被调用之后执行	–	@AfterGroups
+在当前类的第一个测试方法调用之前执行	@BeforeClass	@BeforeClass
+在当前类的最后一个测试方法调用之后执行	@AfterClass	@AfterClass
+每个测试方法之前需要执行	@Before	@BeforeMethod
+每个测试方法之后需要执行	@After	@AfterMethod
+忽略	@ignore	@Test(enbale=false)
+预期异常	@Test(expected = ArithmeticException.class)	@Test(expectedExceptions = ArithmeticException.class)
+超时	@Test(timeout = 1000)	@Test(timeout = 1000)
+JUnit 4 和 TestNG 之间注解方面的区别主要有以下几点：
+1.	在Junit 4 中，如果我们需要在方法前面使用@BeforeClass和@AfterClass，那么该测试方法则必须是静态方法。TestNG 在方法定义部分则更加的灵活，它不需要类似的约束。
+2.	3个附加的setUp/tearDown级别：套件和分组（@Before/AfterSuite, @Before/AfterTest, @Before/AfterGroup）。想了解详细的请看这里
+•	首页
+•	所有文章
+•	资讯
+•	Web
+•	架构
+•	基础技术
+•	书籍
+•	教程
+•	Java小组
+•	工具资源
+2	JUnit 4 与 TestNG 对比
+2015/07/13 | 分类： 基础技术, 未分类 | 0 条评论 | 标签： JUnit 4, TestNG
+分享到： 8 
+原文出处： 付学良的网志
+这两天在看一本书《Java测试新技术TestNG和高级概念》， 作者是 TestNG 的创始人，了解了不少关于 TestNG 的知识，看了一篇文章基本把这本书的几个观点都体现了，那我就直接翻译原文就好，省得自己总结。这两天要不是等原作者的授权的话可能周末本文就发布了，没 经过人家许可翻译人家文章应该的确也不是什么光彩的事情，等等无妨。原文链接JUnit 4 Vs TestNG – Comparison，非常感谢作者写出好文，不过mkyong先生写了的确好多文章，经常搜个文章 google 第一篇总是他的。如果有翻译问题，请拍砖。
+————————————————————————————————————————————
+Junit 4 和 TestNG 都是 Java 方面非常流行的单元测试框架。在功能上两个框架都非常类似。到底哪个比较好？在Java项目中我们应该选择哪个框架？
+下图将会对Junit 4 和 TestNG 做个功能特征的对比。
+ 
+2.1	注解支持
+Junit 4 和 TestNG 在注解方面的实现非常相似。
+特性	JUnit 4	TestNG
+测试注解	@Test	@Test
+测试套件在执行之前需要执行的	–	@BeforeSuite
+测试套件在执行之后需要执行的	–	@AfterSuite
+在测试之前需要执行的	–	@BeforeTest
+在测试之后需要执行的	–	@AfterTest
+在一个测试方法所属于的任意一个组的第一个方法被调用之前执行	–	@BeforeGroups
+在一个测试方法所属于的任意一个组的最后一个方法被调用之后执行	–	@AfterGroups
+在当前类的第一个测试方法调用之前执行	@BeforeClass	@BeforeClass
+在当前类的最后一个测试方法调用之后执行	@AfterClass	@AfterClass
+每个测试方法之前需要执行	@Before	@BeforeMethod
+每个测试方法之后需要执行	@After	@AfterMethod
+忽略	@ignore	@Test(enbale=false)
+预期异常	@Test(expected = ArithmeticException.class)	@Test(expectedExceptions = ArithmeticException.class)
+超时	@Test(timeout = 1000)	@Test(timeout = 1000)
+JUnit 4 和 TestNG 之间注解方面的区别主要有以下几点：
+1.	在Junit 4 中，如果我们需要在方法前面使用@BeforeClass和@AfterClass，那么该测试方法则必须是静态方法。TestNG 在方法定义部分则更加的灵活，它不需要类似的约束。
+2.	3个附加的setUp/tearDown级别：套件和分组（@Before/AfterSuite, @Before/AfterTest, @Before/AfterGroup）。想了解详细的请看这里
+JUnit 4
+1
+2
+3
+4
+5	@BeforeClass
+public static void oneTimeSetUp() {
+    // one-time initialization code   
+    System.out.println("@BeforeClass - oneTimeSetUp");
+}
+TestNG
+1
+2
+3
+4
+5	@BeforeClass
+public void oneTimeSetUp() {
+    // one-time initialization code   
+    System.out.println("@BeforeClass - oneTimeSetUp");
+}
+在Junit 4中，注解的命名是比较令人困惑的，例如 Before, After and Expected，我们不是很确切的能理解在方法前面有Before和After这样的注解是做什么的，同样Expected也如此。TestNG在这方面做的就好很多，注解使用了BeforeMethod，AfterMethod和ExpectedException，这样的名字就非常好理解了。
+2.2	异常测试
+异常测试的意思是在单元测试中应该抛出什么异常是合理的，这个特性在两个框架都已经实现。
+JUnit 4
+1
+2
+3
+4	@Test(expected = ArithmeticException.class)  
+public void divisionWithException() {  
+    int i = 1/0;
+}
+TestNG
+1
+2
+3
+4	@Test(expectedExceptions = ArithmeticException.class)  
+public void divisionWithException() {  
+    int i = 1/0;
+}
+2.3	忽略测试
+忽略测试意思是在单元测试哪些是可以被忽略的，这个特性在两个框架都已经实现。
+JUnit 4
+1
+2
+3
+4
+5	@Ignore("Not Ready to Run")  
+@Test
+public void divisionWithException() {  
+    System.out.println("Method is not ready yet");
+}
+TestNG
+1
+2
+3
+4	@Test(enabled=false)
+public void divisionWithException() {  
+    System.out.println("Method is not ready yet");
+}
+2.4	时间测试
+时间测试意思是如果一个单元测试运行的时间超过了一个指定的毫秒数，那么测试将终止并且标记为失败的测试，这个特性在两个框架都已经实现。
+JUnit 4
+1
+2
+3
+4	@Test(timeout = 1000)  
+public void infinity() {  
+    while (true);  
+}
+TestNG
+1
+2
+3
+4	@Test(timeOut = 1000)  
+public void infinity() {  
+    while (true);  
+}
+2.5	套件测试
+套件测试就是把几个单元测试组合成一个模块，然后运行，这个特性两个框架均已实现。然而却是用了两个不同的方式来实现的。
+JUnit 4
+@RunWith 和 @Suite注解被用于执行套件测试。下面的代码是所展示的是在JunitTest5被执行之后需要JunitTest1 和 JunitTest2也一起执行。所有的声明需要在类内部完成。
+1
+2
+3
+4
+5
+6
+7	@RunWith(Suite.class)
+@Suite.SuiteClasses({
+    JunitTest1.class,
+    JunitTest2.class
+})
+public class JunitTest5 {
+}
+TestNG
+执行套件测试是使用XML文件配置的方式来做。下面的 XML 的文件可以使得TestNGTest1和TestNGTest2一起执行。
+1
+2
+3
+4
+5
+6
+7
+8
+9	<!DOCTYPE suite SYSTEM "http://beust.com/testng/testng-1.0.dtd" >
+<suite name="My test suite">
+  <test name="testing">
+    <classes>
+       <class name="com.fsecure.demo.testng.TestNGTest1" />
+       <class name="com.fsecure.demo.testng.TestNGTest2" />
+    </classes>
+  </test>
+</suite>
+TestNG可以在这块做的更好，使用了组的概念，每个方法都可以被分配到一个组里面，可以根据功能特性来分组。例如：
+这是一个有4个方法，3个组(method1, method2 和 method4)的类
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19	@Test(groups="method1")
+public void testingMethod1() {  
+  System.out.println("Method - testingMethod1()");
+}  
+ 
+@Test(groups="method2")
+public void testingMethod2() {  
+    System.out.println("Method - testingMethod2()");
+}  
+ 
+@Test(groups="method1")
+public void testingMethod1_1() {  
+    System.out.println("Method - testingMethod1_1()");
+}  
+ 
+@Test(groups="method4")
+public void testingMethod4() {  
+    System.out.println("Method - testingMethod4()");
+}
+下面XML文件定义了一个只是执行methed1的组的单元测试
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13	<!DOCTYPE suite SYSTEM "http://beust.com/testng/testng-1.0.dtd" >
+<suite name="My test suite">
+  <test name="testing">
+    <groups>
+      <run>
+        <include name="method1"/>
+      </run>
+    </groups>
+    <classes>
+       <class name="com.fsecure.demo.testng.TestNGTest5_2_0" />
+    </classes>
+  </test>
+</suite>
+使用分组的概念，集成测试就会更加强大。例如，我们可以只是执行所有测试中的组名为DatabaseFuntion的测试。
+2.6	参数化测试
+参数化测试意思是给单元测试传多个参数值。这个特性在JUnit 4 和TestNG。然后两个框架实现的方式却完全不同。
+JUnit 4
+@RunWith 和 @Parameter 注解用于为单元测试提供参数值，@Parameters必须返回 List，参数将会被作为参数传给类的构造函数。
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20	@RunWith(value = Parameterized.class)
+public class JunitTest6 {
+ 
+     private int number;
+ 
+     public JunitTest6(int number) {
+        this.number = number;
+     }
+ 
+     @Parameters
+     public static Collection<Object[]> data() {
+       Object[][] data = new Object[][] { { 1 }, { 2 }, { 3 }, { 4 } };
+       return Arrays.asList(data);
+     }
+ 
+     @Test
+     public void pushTest() {
+       System.out.println("Parameterized Number is : " + number);
+     }
+}
+它在使用上有许多的限制；我们必须遵循 JUnit 的方式去声明参数，参数必须通过构造函数的参数去初始化类的成员来用于测试。返回的参数类型必须是List []，数据已经被限定为String或者是一个原始值。
+TestNG
+使用XML文件或者@DataProvider注解来给测试提供参数。
+XML文件配置参数化测试
+只是在方法上声明@Parameters注解，参数的数据将由 TestNG 的 XML 配置文件提供。这样做之后，我们可以使用不同的数据集甚至是不同的结果集来重用一个测试用例。另外，甚至是最终用户，QA 或者 QE 可以提供使用 XML 文件来提供他们自己的数据来做测试。
+Unit Test
+1
+2
+3
+4
+5
+6
+7
+8
+9	public class TestNGTest6_1_0 {
+ 
+   @Test
+   @Parameters(value="number")
+   public void parameterIntTest(int number) {
+      System.out.println("Parameterized Number is : " + number);
+   }
+ 
+  }
+XML 文件
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11	<!DOCTYPE suite SYSTEM "http://beust.com/testng/testng-1.0.dtd" >
+<suite name="My test suite">
+  <test name="testing">
+ 
+    <parameter name="number" value="2"/>  
+ 
+    <classes>
+       <class name="com.fsecure.demo.testng.TestNGTest6_0" />
+    </classes>
+  </test>
+</suite>
+@DataProvider 注解做参数化测试
+使用XML文件初始化数据可以很方便，但是测试偶尔需要复杂的类型，一个String或原始值并不能完全满足。 TestNG 的@ DataProvider的注解，可以更好的把复杂的参数类型映射到一个测试方法来处理这种情况。
+@DataProvider 可以使用 Vector, String 或者 Integer 类型的值作为参数
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15	@Test(dataProvider = "Data-Provider-Function")
+public void parameterIntTest(Class clzz, String[] number) {
+   System.out.println("Parameterized Number is : " + number[0]);
+   System.out.println("Parameterized Number is : " + number[1]);
+}
+ 
+//This function will provide the patameter data
+@DataProvider(name = "Data-Provider-Function")
+public Object[][] parameterIntTestProvider() {
+    return new Object[][]{
+       {Vector.class, new String[] {"java.util.AbstractList", "java.util.AbstractCollection"}},
+       {String.class, new String[] {"1", "2"}},
+       {Integer.class, new String[] {"1", "2"}}
+    };
+}
+@DataProvider 作为对象的参数
+P.S “TestNGTest6_3_0” 是一个简单的对象，使用了get和set方法。
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18	@Test(dataProvider = "Data-Provider-Function")
+public void parameterIntTest(TestNGTest6_3_0 clzz) {
+   System.out.println("Parameterized Number is : " + clzz.getMsg());
+   System.out.println("Parameterized Number is : " + clzz.getNumber());
+}
+ 
+//This function will provide the patameter data
+@DataProvider(name = "Data-Provider-Function")
+public Object[][] parameterIntTestProvider() {
+ 
+    TestNGTest6_3_0 obj = new TestNGTest6_3_0();
+    obj.setMsg("Hello");
+    obj.setNumber(123);
+ 
+    return new Object[][]{
+        {obj}
+    };
+}
+TestNG的参数化测试使用起来非常的友好和灵活 (不管是XML配置还是在类里面注解的方式). 它可以使用许多复杂的数据类型作为参数的值，并且没有什么限制。如上面的例子所示， we even can pass in our own object (TestNGTest6_3_0) for parameterized test
+2.7	依赖测试
+参数化测试意味着测试的方法是有依赖的，也就是要执行的的方法在执行之前需要执行的部分。如果依赖的方法出现错误，所有的子测试都会被忽略，不会被标记为失败。
+JUnit 4
+JUnit 框架主要聚焦于测试的隔离，暂时还不支持这个特性。
+TestNG
+它使用dependOnMethods来实现了依赖测试的功能，如下：
+1
+2
+3
+4
+5
+6
+7
+8
+9	@Test
+public void method1() {
+   System.out.println("This is method 1");
+}
+ 
+@Test(dependsOnMethods={"method1"})
+public void method2() {
+    System.out.println("This is method 2");
+}
+如果method1()成功执行，那么method2()也将被执行，否则method2()将会被忽略。
+2.8	讨论总结
+当我们做完所有特性的对比以后，我建议使用 TestNG 作为 Java 项目的主要单元测试框架，因为 TestNG 在参数化测试、依赖测试以及套件测试（组）方面功能更加强大。TestNG 意味着高级的测试和复杂的集成测试。它更加的灵活，特别是对大的套件测试。另外，TestNG 也涵盖了 JUnit4 的全部功能。那就没有任何理由使用 Junit了。
+•	首页
+•	所有文章
+•	资讯
+•	Web
+•	架构
+•	基础技术
+•	书籍
+•	教程
+•	Java小组
+•	工具资源
+3	JUnit 4 与 TestNG 对比
+2015/07/13 | 分类： 基础技术, 未分类 | 0 条评论 | 标签： JUnit 4, TestNG
+分享到： 8 
+原文出处： 付学良的网志
+这两天在看一本书《Java测试新技术TestNG和高级概念》， 作者是 TestNG 的创始人，了解了不少关于 TestNG 的知识，看了一篇文章基本把这本书的几个观点都体现了，那我就直接翻译原文就好，省得自己总结。这两天要不是等原作者的授权的话可能周末本文就发布了，没 经过人家许可翻译人家文章应该的确也不是什么光彩的事情，等等无妨。原文链接JUnit 4 Vs TestNG – Comparison，非常感谢作者写出好文，不过mkyong先生写了的确好多文章，经常搜个文章 google 第一篇总是他的。如果有翻译问题，请拍砖。
+————————————————————————————————————————————
+Junit 4 和 TestNG 都是 Java 方面非常流行的单元测试框架。在功能上两个框架都非常类似。到底哪个比较好？在Java项目中我们应该选择哪个框架？
+下图将会对Junit 4 和 TestNG 做个功能特征的对比。
+ 
+3.1	注解支持
+Junit 4 和 TestNG 在注解方面的实现非常相似。
+特性	JUnit 4	TestNG
+测试注解	@Test	@Test
+测试套件在执行之前需要执行的	–	@BeforeSuite
+测试套件在执行之后需要执行的	–	@AfterSuite
+在测试之前需要执行的	–	@BeforeTest
+在测试之后需要执行的	–	@AfterTest
+在一个测试方法所属于的任意一个组的第一个方法被调用之前执行	–	@BeforeGroups
+在一个测试方法所属于的任意一个组的最后一个方法被调用之后执行	–	@AfterGroups
+在当前类的第一个测试方法调用之前执行	@BeforeClass	@BeforeClass
+在当前类的最后一个测试方法调用之后执行	@AfterClass	@AfterClass
+每个测试方法之前需要执行	@Before	@BeforeMethod
+每个测试方法之后需要执行	@After	@AfterMethod
+忽略	@ignore	@Test(enbale=false)
+预期异常	@Test(expected = ArithmeticException.class)	@Test(expectedExceptions = ArithmeticException.class)
+超时	@Test(timeout = 1000)	@Test(timeout = 1000)
+JUnit 4 和 TestNG 之间注解方面的区别主要有以下几点：
+1.	在Junit 4 中，如果我们需要在方法前面使用@BeforeClass和@AfterClass，那么该测试方法则必须是静态方法。TestNG 在方法定义部分则更加的灵活，它不需要类似的约束。
+2.	3个附加的setUp/tearDown级别：套件和分组（@Before/AfterSuite, @Before/AfterTest, @Before/AfterGroup）。想了解详细的请看这里
+JUnit 4
+1
+2
+3
+4
+5	@BeforeClass
+public static void oneTimeSetUp() {
+    // one-time initialization code   
+    System.out.println("@BeforeClass - oneTimeSetUp");
+}
+TestNG
+1
+2
+3
+4
+5	@BeforeClass
+public void oneTimeSetUp() {
+    // one-time initialization code   
+    System.out.println("@BeforeClass - oneTimeSetUp");
+}
+在Junit 4中，注解的命名是比较令人困惑的，例如 Before, After and Expected，我们不是很确切的能理解在方法前面有Before和After这样的注解是做什么的，同样Expected也如此。TestNG在这方面做的就好很多，注解使用了BeforeMethod，AfterMethod和ExpectedException，这样的名字就非常好理解了。
+3.2	异常测试
+异常测试的意思是在单元测试中应该抛出什么异常是合理的，这个特性在两个框架都已经实现。
+JUnit 4
+1
+2
+3
+4	@Test(expected = ArithmeticException.class)  
+public void divisionWithException() {  
+    int i = 1/0;
+}
+TestNG
+1
+2
+3
+4	@Test(expectedExceptions = ArithmeticException.class)  
+public void divisionWithException() {  
+    int i = 1/0;
+}
+3.3	忽略测试
+忽略测试意思是在单元测试哪些是可以被忽略的，这个特性在两个框架都已经实现。
+JUnit 4
+1
+2
+3
+4
+5	@Ignore("Not Ready to Run")  
+@Test
+public void divisionWithException() {  
+    System.out.println("Method is not ready yet");
+}
+TestNG
+1
+2
+3
+4	@Test(enabled=false)
+public void divisionWithException() {  
+    System.out.println("Method is not ready yet");
+}
+3.4	时间测试
+时间测试意思是如果一个单元测试运行的时间超过了一个指定的毫秒数，那么测试将终止并且标记为失败的测试，这个特性在两个框架都已经实现。
+JUnit 4
+1
+2
+3
+4	@Test(timeout = 1000)  
+public void infinity() {  
+    while (true);  
+}
+TestNG
+1
+2
+3
+4	@Test(timeOut = 1000)  
+public void infinity() {  
+    while (true);  
+}
+3.5	套件测试
+套件测试就是把几个单元测试组合成一个模块，然后运行，这个特性两个框架均已实现。然而却是用了两个不同的方式来实现的。
+JUnit 4
+@RunWith 和 @Suite注解被用于执行套件测试。下面的代码是所展示的是在JunitTest5被执行之后需要JunitTest1 和 JunitTest2也一起执行。所有的声明需要在类内部完成。
+1
+2
+3
+4
+5
+6
+7	@RunWith(Suite.class)
+@Suite.SuiteClasses({
+    JunitTest1.class,
+    JunitTest2.class
+})
+public class JunitTest5 {
+}
+TestNG
+执行套件测试是使用XML文件配置的方式来做。下面的 XML 的文件可以使得TestNGTest1和TestNGTest2一起执行。
+1
+2
+3
+4
+5
+6
+7
+8
+9	<!DOCTYPE suite SYSTEM "http://beust.com/testng/testng-1.0.dtd" >
+<suite name="My test suite">
+  <test name="testing">
+    <classes>
+       <class name="com.fsecure.demo.testng.TestNGTest1" />
+       <class name="com.fsecure.demo.testng.TestNGTest2" />
+    </classes>
+  </test>
+</suite>
+TestNG可以在这块做的更好，使用了组的概念，每个方法都可以被分配到一个组里面，可以根据功能特性来分组。例如：
+这是一个有4个方法，3个组(method1, method2 和 method4)的类
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19	@Test(groups="method1")
+public void testingMethod1() {  
+  System.out.println("Method - testingMethod1()");
+}  
+ 
+@Test(groups="method2")
+public void testingMethod2() {  
+    System.out.println("Method - testingMethod2()");
+}  
+ 
+@Test(groups="method1")
+public void testingMethod1_1() {  
+    System.out.println("Method - testingMethod1_1()");
+}  
+ 
+@Test(groups="method4")
+public void testingMethod4() {  
+    System.out.println("Method - testingMethod4()");
+}
+下面XML文件定义了一个只是执行methed1的组的单元测试
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13	<!DOCTYPE suite SYSTEM "http://beust.com/testng/testng-1.0.dtd" >
+<suite name="My test suite">
+  <test name="testing">
+    <groups>
+      <run>
+        <include name="method1"/>
+      </run>
+    </groups>
+    <classes>
+       <class name="com.fsecure.demo.testng.TestNGTest5_2_0" />
+    </classes>
+  </test>
+</suite>
+使用分组的概念，集成测试就会更加强大。例如，我们可以只是执行所有测试中的组名为DatabaseFuntion的测试。
+3.6	参数化测试
+参数化测试意思是给单元测试传多个参数值。这个特性在JUnit 4 和TestNG。然后两个框架实现的方式却完全不同。
+JUnit 4
+@RunWith 和 @Parameter 注解用于为单元测试提供参数值，@Parameters必须返回 List，参数将会被作为参数传给类的构造函数。
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20	@RunWith(value = Parameterized.class)
+public class JunitTest6 {
+ 
+     private int number;
+ 
+     public JunitTest6(int number) {
+        this.number = number;
+     }
+ 
+     @Parameters
+     public static Collection<Object[]> data() {
+       Object[][] data = new Object[][] { { 1 }, { 2 }, { 3 }, { 4 } };
+       return Arrays.asList(data);
+     }
+ 
+     @Test
+     public void pushTest() {
+       System.out.println("Parameterized Number is : " + number);
+     }
+}
+它在使用上有许多的限制；我们必须遵循 JUnit 的方式去声明参数，参数必须通过构造函数的参数去初始化类的成员来用于测试。返回的参数类型必须是List []，数据已经被限定为String或者是一个原始值。
+TestNG
+使用XML文件或者@DataProvider注解来给测试提供参数。
+XML文件配置参数化测试
+只是在方法上声明@Parameters注解，参数的数据将由 TestNG 的 XML 配置文件提供。这样做之后，我们可以使用不同的数据集甚至是不同的结果集来重用一个测试用例。另外，甚至是最终用户，QA 或者 QE 可以提供使用 XML 文件来提供他们自己的数据来做测试。
+Unit Test
+1
+2
+3
+4
+5
+6
+7
+8
+9	public class TestNGTest6_1_0 {
+ 
+   @Test
+   @Parameters(value="number")
+   public void parameterIntTest(int number) {
+      System.out.println("Parameterized Number is : " + number);
+   }
+ 
+  }
+XML 文件
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11	<!DOCTYPE suite SYSTEM "http://beust.com/testng/testng-1.0.dtd" >
+<suite name="My test suite">
+  <test name="testing">
+ 
+    <parameter name="number" value="2"/>  
+ 
+    <classes>
+       <class name="com.fsecure.demo.testng.TestNGTest6_0" />
+    </classes>
+  </test>
+</suite>
+@DataProvider 注解做参数化测试
+使用XML文件初始化数据可以很方便，但是测试偶尔需要复杂的类型，一个String或原始值并不能完全满足。 TestNG 的@ DataProvider的注解，可以更好的把复杂的参数类型映射到一个测试方法来处理这种情况。
+@DataProvider 可以使用 Vector, String 或者 Integer 类型的值作为参数
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15	@Test(dataProvider = "Data-Provider-Function")
+public void parameterIntTest(Class clzz, String[] number) {
+   System.out.println("Parameterized Number is : " + number[0]);
+   System.out.println("Parameterized Number is : " + number[1]);
+}
+ 
+//This function will provide the patameter data
+@DataProvider(name = "Data-Provider-Function")
+public Object[][] parameterIntTestProvider() {
+    return new Object[][]{
+       {Vector.class, new String[] {"java.util.AbstractList", "java.util.AbstractCollection"}},
+       {String.class, new String[] {"1", "2"}},
+       {Integer.class, new String[] {"1", "2"}}
+    };
+}
+@DataProvider 作为对象的参数
+P.S “TestNGTest6_3_0” 是一个简单的对象，使用了get和set方法。
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18	@Test(dataProvider = "Data-Provider-Function")
+public void parameterIntTest(TestNGTest6_3_0 clzz) {
+   System.out.println("Parameterized Number is : " + clzz.getMsg());
+   System.out.println("Parameterized Number is : " + clzz.getNumber());
+}
+ 
+//This function will provide the patameter data
+@DataProvider(name = "Data-Provider-Function")
+public Object[][] parameterIntTestProvider() {
+ 
+    TestNGTest6_3_0 obj = new TestNGTest6_3_0();
+    obj.setMsg("Hello");
+    obj.setNumber(123);
+ 
+    return new Object[][]{
+        {obj}
+    };
+}
+TestNG的参数化测试使用起来非常的友好和灵活 (不管是XML配置还是在类里面注解的方式). 它可以使用许多复杂的数据类型作为参数的值，并且没有什么限制。如上面的例子所示， we even can pass in our own object (TestNGTest6_3_0) for parameterized test
+3.7	依赖测试
+参数化测试意味着测试的方法是有依赖的，也就是要执行的的方法在执行之前需要执行的部分。如果依赖的方法出现错误，所有的子测试都会被忽略，不会被标记为失败。
+JUnit 4
+JUnit 框架主要聚焦于测试的隔离，暂时还不支持这个特性。
+TestNG
+它使用dependOnMethods来实现了依赖测试的功能，如下：
+1
+2
+3
+4
+5
+6
+7
+8
+9	@Test
+public void method1() {
+   System.out.println("This is method 1");
+}
+ 
+@Test(dependsOnMethods={"method1"})
+public void method2() {
+    System.out.println("This is method 2");
+}
+如果method1()成功执行，那么method2()也将被执行，否则method2()将会被忽略。
+3.8	讨论总结
+当我们做完所有特性的对比以后，我建议使用 TestNG 作为 Java 项目的主要单元测试框架，因为 TestNG 在参数化测试、依赖测试以及套件测试（组）方面功能更加强大。TestNG 意味着高级的测试和复杂的集成测试。它更加的灵活，特别是对大的套件测试。另外，TestNG 也涵盖了 JUnit4 的全部功能。那就没有任何理由使用 Junit了。
+3.9	参考资料
+TestNG
+————
+http://en.wikipedia.org/wiki/TestNG
+http://www.ibm.com/developerworks/java/library/j-testng/
+http://testng.org/doc/index.html
+http://beust.com/weblog/
+JUnit
+———–
+http://en.wikipedia.org/wiki/JUnit
+http://www.ibm.com/developerworks/java/library/j-junit4.html
+http://junit.sourceforge.net/doc/faq/faq.htm
+http://www.devx.com/Java/Article/31983/0/page/3
+http://ourcraft.wordpress.com/2008/08/27/writing-a-parameterized-junit-test/
+TestNG VS JUnit
+——————
+http://docs.codehaus.org/display/XPR/Migration+to+JUnit4+or+TestNG
+http://www.ibm.com/developerworks/java/library/j-cq08296/index.html
+http://www.cavdar.net/2008/07/21/junit-4-in-60-seconds/
+
+
+
+
