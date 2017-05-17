@@ -1,0 +1,17 @@
+1	打公共jar包徐婷君修改部分冲突
+2	开发mergerequest CI代码合入到主库测试
+3	Flink测试工程上maven
+4	测试公共jar包源码包上传至maven中央库
+5	接手CIE的工作，定位CI跑失败的问题
+6	新建jenkins工程，清理配置文件CI环境
+7	新建jenkins工程，反馈当前CI机器使用情况
+8	接手carbon对接spark2.0（武钰杰）
+9	"http://100.106.75.10:8080/jenkins/view/SmokeTest/job/V100R002C30SPC100_HQ_Spark1.5_SmokeTest/
+http://100.106.75.6:8080/jenkins/view/Test_Team/job/DataSight_V100R002C30SPC100_HQ_Spark2.1_SmokeTest/"
+10	"出来开发提的issue
+http://code.huawei.com/datasight/datasightDashboard/issues/18"
+11	提问题单，修改各开发库里面的测试库代码
+12	测试工程提交Merge Request自动触发触发Merge Request CI工程
+13	印度测试提的http://code.huawei.com/datasight/datasightDashboard/issues/17新增capacity schedule调度接口
+14	统计只能跑FI的用例
+15  
