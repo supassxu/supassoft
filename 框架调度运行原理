@@ -1,0 +1,389 @@
+	在Jenkins页面触发构建，完成配置、拷贝集群安装包、编译工程等任务后，
+执行命令ant -f DataSightBasePlatform_build.xml runMain最终调用了
+Runmain类main函数中的方法run_all()，这个地方是自动化框架的主入口。
+run_all()
+	1，Topo.execute()
+		(1) 方法execute()调用getPropertyCommon实例的initTopo()方法，从配置文件topo.property中获取topo的个数；
+		(2) 通过配置项中topo名称来获取每个topo中要安装的集群类型（可能是ANT集群或FM单集群或者FM多集群）、
+要执行的测试用例、topo列表topoList、期望使用节点数expectNodeNum和最少使用节点数minNodeNum；
+	2，OccupyNodes.execute()
+		(1) 方法occupy(expectNodeNum)会获取期望使用的节点数并添加到occupyNodeIpList集合中；
+在类OccupyResource中，从节点池(文件totalNodeListFile.properties)中获取expectNodeNum数的节点，并放在selectNodeList中；
+通过判断节点上是否存在tag file来判断节点是否被占用，如果未被占用，就将此节点ip添加到selectNodeList中；如果此节点被占用，就从selectNodeList中移除；
+		(2) 如果获取的占用节点数小于minNodeNum，将会等待60000ms（waitIntervalIfNodesNotEnough的值）后重新尝试占用直到达到minNodeNum；
+	3，AllocateOccupyNodes.execute()
+		(1) 如果占用的节点数等于期望节点数，就这些节点分配给每个topo；
+		(2) 如果占用的节点数小于期望节点数，
+例如：有50个节点，5个topo，每个topo的 节点数/期望集群数/最小集群数 分别为：3/5/2、3/5/2、5/3/2、3/2/2、6/2/2，
+首先，使每个topo满足最小集群数，那么剩下的节点数为：50-3*2-3*2-5*2-3*2-6*2=10，
+然后，先满足topo1期望集群数，再满足topo2期望集群数，依次类推直到节点被分配完，剩下的节点被释放掉，也就是，10-3*(5-2)=1；
+最终每个topo分配的结果为：3*5、3*2、5*2、3*2、6*2，剩下的1个节点满足不了topo2的期望集群数，就被释放掉；
+	4，ClearAllNodes.execute()
+		(1) 方法clearNodeEnv(occupyNodeIpArray, clearNodeEnv)中第一个参数是一个数组，存放了所有占用的节点ip，第二个参数是用来清除节点环境的命令；
+		(2) 创建占用节点数个数的线程，到每个节点上执行清除环境的命令，主要是调用方法clearNodeEnv(...)清除节点中可能存在的ANT或FI集群；
+	5，GetFloatIpList.execute()
+		(1) 只有在安装FI集群(安装DBService服务需要配置浮动IP)时才需要配置浮动IP，安装ANT集群不需要配置浮动IP；
+		(2) 如果是FI单集群，要配置的浮动IP数等于安装的集群数；如果是FI多集群，要配置的浮动IP数等于安装集群数的2倍；
+		(3) 配置浮动IP需要的是小网IP，范围是：192.168.1.1~192.168.254.254，循环遍历这个范围内所有IP，使用ping命令
+来验证哪些IP是ping不通的，把ping不通的IP添加到floatIpFMList中作为要配置的浮动IP；
+	6，GetClusterlist.execute()
+		topo.getClusterList()
+			ClusterTopoFMSingle.java
+			（FI单集群）
+				(1) 步骤1初始化过程中已经获取了topoList，遍历topoList时调用topo对象的getClusterList()方法得到存放集群列表的数组clusterListTotal；
+				(2) 由于测试项目工程要拷贝到客户端节点，测试用例也是在这个节点上执行的，因此要获取客户端节点列表clientNodeIpArray；
+				(3)为了后续给每个集群分配测试用例，需要将得到的cluster对象放到LinkedBlockingQueue中
+（clusterLinkedBlockingQueueHashMap.put(cluster,clusterLinkedBlockingQueue）；
+			ClusterTopoFMMulti.java
+			（FI多集群）
+				参考FI单集群说明；
+			ClusterTopoANT.java
+			（ANT集群）
+				参考FI单集群说明；
+	7，SetupEnv.execute()
+		运行脚本setup_env_everybuild.sh为各个节点配置ntp服务器，确保各节点间时间同步；
+	8，CopyProject.execute()
+		(1) 将自动化测试框架工程拷贝到集群客户端节点上。需要注意的是，在给FI集群拷贝工程时，每个FI多集群有两个客户端节点，需要拷贝两次；
+		(2) 创建空的testHomeRemote目录，如存在此目录先删除；创建空的NFS_mount_path 目录作为客户端节点的挂载点目录，如存在先删除；
+将CI机器上的工程目录testHomeLocal共享给NFS_mount_path，最后启用多线程将NFS_mount_path目录下的工程拷贝到每个客户端节点的testHomeRemote目录下；
+	9，new SetupClusterInstallationTool.execute()
+		new RunSetupClusterInstallationTool(cluster)
+			setepClusterInstallationTool(cluster)
+三种集群对应三种实现
+				ClusterOperationFMSingle.java
+			（FI单集群）
+					createPropertyFile(cluster)
+						(1) 创建安装FM集群使用的配置文件clustersetup_ha_FM.properties，在此文件中配置FI集群拓扑信息；
+						(2) 在CI主机指定目录（每个目录会以客户端节点ip名作为后缀来保证唯一性）下创建一个与clustersetup_ha_FM.properties同名
+的空文件，将要配置的配置项赋值后与剩下的配置项一行一行地写到空文件中，最后把这个文件拷贝每个客户端节点的指定目录下；
+					createCollectLogConfClusterIni(cluster)
+						
+(1) 创建搜集日志的配置文件cluster.ini；
+						(2) 在CI主机指定目录（每个目录会以客户端节点ip名作为后缀来保证唯一性）下创建一个与cluster.ini同名的空文件，
+将要配置的配置项赋值后与剩下的配置项一行一行地写到空文件中，最后把这个文件拷贝每个客户端节点的指定目录下；
+					createClusterSetupHAFMPropertyFile(cluster)
+					createConfigCommonPropertyFile(cluster)
+					copyReleaseIso(cluster)
+						
+
+
+从指定主机的ReleaseIsoPath目录拷贝FI集群镜像文件到远程的每个节点的FMHomeRemote目录下；
+					createPatchToolConfIni(cluster)
+						
+由于补丁工具配置文件跟日志收集配置文件是相同的，只需将日志收集目录/collect_log下的
+cluster.ini文件拷贝到补丁工具指定的目录下（/Patch_tools_*/03.InstallorUninstall/cluster/）；
+					创建执行测试用例需要的配置文件
+						在CI主机指定目录（每个目录会以客户端节点ip名作为后缀来保证唯一性）下创建一个与clustersetup_ha_FM.properties同名
+的空文件，将要配置的配置项赋值后与剩下的配置项一行一行地写到空文件中，最后把这个文件拷贝每个客户端节点的指定目录下；
+						在CI主机指定目录（每个目录会以客户端节点ip名作为后缀来保证唯一性）下创建一个与config_common.properties同名
+的空文件，将要配置的配置项赋值后与剩下的配置项一行一行地写到空文件中，最后把这个文件拷贝每个客户端节点的指定目录下；
+				ClusterOperationFMMulti.java
+			（FI多集群）
+					参考FI单集群，需要注意的是，FI多集群中每个集群有两个客户端，要创建两个配置文建并拷贝配置文件分别给两个客户端节点；
+				ClusterOperationANT.java
+			（ANT集群）
+					createPropertyFile(cluster)
+						参考FI单集群；
+					createConfigCommonPropertyFile(cluster)
+						参考FI单集群；
+					注：安装ANT集群不需要镜像文件，不需要安装Patch补丁包，跑测试用只需要config_common.properties这一个文件；
+	10，new InstallCluster().execute()
+		创建clusterListTotalNum数的线程安装相同数量的集群
+new RunInstallCluster(i)
+			installCluster(cluster)
+三种集群对应三种实现
+				ClusterOperationFMSingle.java
+			（FI单集群）
+					
+(1) 登录客户端节点，执行FMHomeRemote目录下的start.sh脚本开始安装集群；
+					(2) 调用checkClusterHealth(cluster)方法检查集群是否安装成功；
+					(3) 若集群安装成功，使用ant脚本ant -f runJava.xml ClusterRestart -Doperation='stop' 调用
+DataSightBasePlatform_TestCode_HQ模块中ClusterRestart类的restartCluster(...)方法停止集群；
+					(4) 集群停止后，安装Patch补丁包到集群和客户端;
+集群版本不同，安装的Patch补丁包也不同；
+						C60版本FI集群
+							
+(1) 执行InstallAllPatch.sh脚本安装Patch补丁包到集群，执行DistributeCheckFiles.sh脚本检查Patch补丁是否成功安装到集群；
+							(2) 使用ant脚本ant -f runJava.xml ClusterRestart -Doperation='start' 调用DataSightBasePlatform_TestCode_HQ
+模块中ClusterRestart类的restartCluster(...)方法启动集群；
+							(3) 集群启动后，执行InstallClient.sh脚本安装Patch补丁包到客户端，然后执行CheckClient.sh脚本检查Patch补丁是否成功安装到客户端；
+							(4) 若以上都执行成功，installCluster(cluster)方法返回true，否则返回false；
+						C70版本FI集群
+							
+(1) 执行InstallAllPatch.sh1.5脚本安装1.5版本Patch补丁包到集群，执行DistributeCheckFiles.sh1.5脚本检查Patch补丁是否成功安装到集群；
+							(2) 若1.5版本Patch安装成功， 执行InstallAllPatch.sh2.1脚本安装2.1版本Patch补丁包到集群，执行DistributeCheckFiles.sh2.1脚本检查Patch补丁是否成功安装到集群;
+							(3) 使用ant脚本ant -f runJava.xml ClusterRestart -Doperation='start' 调用DataSightBasePlatform_TestCode_HQ
+模块中ClusterRestart类的restartCluster(...)方法启动集群；
+							(4) 集群启动后，执行InstallClient.sh脚本安装1.5版本Patch补丁包到客户端，然后执行CheckClient.sh脚本检查Patch补丁是否成功安装到客户端；
+							(5) 若1.5版本Patch安装成功，执行InstallClient.sh脚本安装2.1版本Patch补丁包到客户端，然后执行CheckClient.sh脚本检查Patch补丁是否成功安装到客户端；
+							(6) 若以上都执行成功，installCluster(cluster)方法返回true，否则返回false；
+					(5) 若集群安装成功，调用方法runGetPutFile()从客户端节点获取DataSightBasePlatform_TestCode_HQ测试代码工程运行需要的cconf文件和jar包；
+若集群安装失败，会重新安装，在Jenkins中通过RETRY.REINSTALL.MAX.TIME配置项控制重装次数；
+				ClusterOperationFMMulti.java
+			（FI多集群）
+					
+参考FI单集群的步骤(1)；
+不同的是，多集群安装时每个集群其实是装了两套集群；
+				ClusterOperationANT.java
+			（ANT集群）
+					
+(1) 登录集群的客户端节点依次执行以下ant命令：
+ant -f remote_ha.xml——>安装ANT集群；
+ant -f remote_ha.xml install.client——>安装客户端；
+ant -f remote_ha.xml startup.cluster——>启动集群；
+(2) 检查集群是否安装成功；
+checkClusterHealth(cluster)——>checkNode(...)
+(3) 接下来的运行流程参考FI单集群中的步骤(5)；
+	11，MonitorEnvState.startMonitor()
+		(1) 通过nmon工具和top命令监控节点环境状况(例如CPU、内存等)，nmon工具的安装在ant脚本CI_env_setup.xml中实现；
+		(2) 调用startMonitor()方法后，会启用与占用节点数（occupyNodeList）相等的线程，在所有占用节点上执行nmon命令监控节点CPU占用率、内存占用率等，
+同样也执行top命令监控进程状况，最终两者都会以指定的时间间隔搜集一定次数的监控信息，并将这些信息不断追加到指定的文件中；
+	12，new ExecuteTestCase().execute()
+		(1) 创建topoList.size()个线程，来给每个topo分配
+测试用例——>new RunDispatcher(topo)
+			dispatcher.dispatch()
+				new TestTask()
+					(1) 将每个clusterTopo对应的测试用例testCases循环一一取出；
+同时，从步骤5中put值后的clusterLinkedBlockingQueue中take()得到clusterTopo中的一个集群，并得到集群的管理节点ip；
+把取出的测试用例分配给这个管理节点，调用execCommand.exec(buildCommand())执行测试用例；
+					(2) 执行每个测试用例会有一个超时时间CI_ONE_TEST_CASE_TIMEOUT_SECONDS，如果执行某个测试用例超过了这个时间，
+就把这个测试用例重新添加到数组testCases中（ clusterTopo.testCases.add(testCase)）重跑；
+					(3) 如果某个节点在跑测试用例时，出现了IOException，这个节点将不会再被使用，这个测试用例会重新添加到testCases
+中分配给其他集群重跑；
+			dispatcherTestClass.dispatch()
+				
+参考上面dispatcher.dispatch()；
+		
+(2) 如果在Jenkin中配置了determineCaseFileName
+(就是可以指定要跑某个suite文件中的某个或多个测试用例)
+			
+在Jenkins中配置ant命令：ant -f runJava.xml createSuiteFileForDetermineCase -DdetermineCaseFilePath=$DetermineCaseFileTopo1
+调用类GenerateSuiteFromDetermineCaseFile创建一个suite文件，来存放指定要跑的测试用例，把这个suite文件放到测试代码工程中
+一起编译，最后跟同样是跟其他测试用例分配给集群；
+	13，MonitorEnvState.killMonitor()
+		在所有测试用例都跑完之后，停止监控节点，使用kill命令杀掉nmon进程和top进程；
+	14，CollectMonitorResult.execute()
+		启用与占用节点数（occupyNodeList）相等的线程，将所有占用节点中监控信息文件拷贝到CI机器的指定目录下，
+为了使存放监控信息的文件与每个节点一一对应，在拷贝时会给每个文件的文件名加上其对应节点的IP名；
+代码实现：CollectMonitorResult.java类——>方法multiThreadScpGet(...)——>new getFromRemote(...)——>scp.getFile(..)
+	15，CollectTestResult.execute()
+		在Dispatcher类中，跑完测试用例会对test结果作判断：
+result = new SingleTestResult()——>execCommand.exec(buildCommand())
+			测试用例跑成功
+				(1) buildCommand()方法中，用ant脚本通过junit将测试结果写到指定的xml格式的文件中;
+				(2) 创建客户端节点个数的线程，将测试报告文件重命名、zip压缩，拷贝到CI机器指定目录
+下（/TestResult/TestReport/），最后解压、删除压缩包文件；
+			测试用例没跑成功
+（failed或error）
+				调用方法dumpLog(ip)，将失败用例的测试结果文件拷贝到CI机器指定目录下（/TestResult/TestReportFailed/）;
+	16，new CollectClusterLogConf().execute()
+		创建clusterListTotalNum个数的线程搜集日志文件
+new RunCollectClusterLogConf(i)
+			collectClusterLogConf(cluster)
+				ClusterOperationFMSingle.java
+			（FI单集群）
+					(1) 执行脚本get_all.sh 搜集所有日志信息（clusterConf、clusterLog、containerlogs、hdfsmeta等）；
+					(2) 将存放日志信息的文件重新命名以.zip结尾；
+					(3)将远程客户端节点上的日志文件全部拷贝到本地CI机器的指定目录下，拷贝时会给每个日志文件的名称追加对应的客户端ip后缀；
+				ClusterOperationFMMulti.java
+			（FI多集群）
+					同FI单集群；
+				ClusterOperationANT.java
+			（ANT集群）
+					(1) 执行ant脚本搜集所有日志信息；
+					(2) 将存放日志信息的文件重新命名以.zip结尾;
+					(3) 将远程客户端节点上的日志文件全部拷贝到本地CI机器的指定目录下,拷贝时会给每个日志文件的名称追加对应的客户端ip后缀；
+1，Topo.execute()
+	(1) 方法execute()调用getPropertyCommon实例的initTopo()方法，从配置文件topo.property中获取topo的个数；
+	(2) 通过配置项中topo名称来获取每个topo中要安装的集群类型（可能是ANT集群或FM单集群或者FM多集群）、
+要执行的测试用例、topo列表topoList、期望使用节点数expectNodeNum和最少使用节点数minNodeNum；
+2，OccupyNodes.execute()
+	(1) 方法occupy(expectNodeNum)会获取期望使用的节点数并添加到occupyNodeIpList集合中；
+在类OccupyResource中，从节点池(文件totalNodeListFile.properties)中获取expectNodeNum数的节点，并放在selectNodeList中；
+通过判断节点上是否存在tag file来判断节点是否被占用，如果未被占用，就将此节点ip添加到selectNodeList中；如果此节点被占用，就从selectNodeList中移除；
+	(2) 如果获取的占用节点数小于minNodeNum，将会等待60000ms（waitIntervalIfNodesNotEnough的值）后重新尝试占用直到达到minNodeNum；
+3，AllocateOccupyNodes.execute()
+	(1) 如果占用的节点数等于期望节点数，就这些节点分配给每个topo；
+	(2) 如果占用的节点数小于期望节点数，
+例如：有50个节点，5个topo，每个topo的 节点数/期望集群数/最小集群数 分别为：3/5/2、3/5/2、5/3/2、3/2/2、6/2/2，
+首先，使每个topo满足最小集群数，那么剩下的节点数为：50-3*2-3*2-5*2-3*2-6*2=10，
+然后，先满足topo1期望集群数，再满足topo2期望集群数，依次类推直到节点被分配完，剩下的节点被释放掉，也就是，10-3*(5-2)=1；
+最终每个topo分配的结果为：3*5、3*2、5*2、3*2、6*2，剩下的1个节点满足不了topo2的期望集群数，就被释放掉；
+4，ClearAllNodes.execute()
+	(1) 方法clearNodeEnv(occupyNodeIpArray, clearNodeEnv)中第一个参数是一个数组，存放了所有占用的节点ip，第二个参数是用来清除节点环境的命令；
+	(2) 创建占用节点数个数的线程，到每个节点上执行清除环境的命令，主要是调用方法clearNodeEnv(...)清除节点中可能存在的ANT或FI集群；
+5，GetFloatIpList.execute()
+	(1) 只有在安装FI集群(安装DBService服务需要配置浮动IP)时才需要配置浮动IP，安装ANT集群不需要配置浮动IP；
+	(2) 如果是FI单集群，要配置的浮动IP数等于安装的集群数；如果是FI多集群，要配置的浮动IP数等于安装集群数的2倍；
+	(3) 配置浮动IP需要的是小网IP，范围是：192.168.1.1~192.168.254.254，循环遍历这个范围内所有IP，使用ping命令
+来验证哪些IP是ping不通的，把ping不通的IP添加到floatIpFMList中作为要配置的浮动IP；
+6，GetClusterlist.execute()
+	topo.getClusterList()
+		ClusterTopoFMSingle.java
+			（FI单集群）
+			(1) 步骤1初始化过程中已经获取了topoList，遍历topoList时调用topo对象的getClusterList()方法得到存放集群列表的数组clusterListTotal；
+			(2) 由于测试项目工程要拷贝到客户端节点，测试用例也是在这个节点上执行的，因此要获取客户端节点列表clientNodeIpArray；
+			(3)为了后续给每个集群分配测试用例，需要将得到的cluster对象放到LinkedBlockingQueue中
+（clusterLinkedBlockingQueueHashMap.put(cluster,clusterLinkedBlockingQueue）；
+		ClusterTopoFMMulti.java
+			（FI多集群）
+			参考FI单集群说明；
+		ClusterTopoANT.java
+			（ANT集群）
+			参考FI单集群说明；
+7，SetupEnv.execute()
+	运行脚本setup_env_everybuild.sh为各个节点配置ntp服务器，确保各节点间时间同步；
+8，CopyProject.execute()
+	(1) 将自动化测试框架工程拷贝到集群客户端节点上。需要注意的是，在给FI集群拷贝工程时，每个FI多集群有两个客户端节点，需要拷贝两次；
+	(2) 创建空的testHomeRemote目录，如存在此目录先删除；创建空的NFS_mount_path 目录作为客户端节点的挂载点目录，如存在先删除；
+将CI机器上的工程目录testHomeLocal共享给NFS_mount_path，最后启用多线程将NFS_mount_path目录下的工程拷贝到每个客户端节点的testHomeRemote目录下；
+9，new SetupClusterInstallationTool.execute()
+	new RunSetupClusterInstallationTool(cluster)
+		setepClusterInstallationTool(cluster)
+三种集群对应三种实现
+			ClusterOperationFMSingle.java
+			（FI单集群）
+				createPropertyFile(cluster)
+					(1) 创建安装FM集群使用的配置文件clustersetup_ha_FM.properties，在此文件中配置FI集群拓扑信息；
+					(2) 在CI主机指定目录（每个目录会以客户端节点ip名作为后缀来保证唯一性）下创建一个与clustersetup_ha_FM.properties同名
+的空文件，将要配置的配置项赋值后与剩下的配置项一行一行地写到空文件中，最后把这个文件拷贝每个客户端节点的指定目录下；
+				createCollectLogConfClusterIni(cluster)
+					
+(1) 创建搜集日志的配置文件cluster.ini；
+					(2) 在CI主机指定目录（每个目录会以客户端节点ip名作为后缀来保证唯一性）下创建一个与cluster.ini同名的空文件，
+将要配置的配置项赋值后与剩下的配置项一行一行地写到空文件中，最后把这个文件拷贝每个客户端节点的指定目录下；
+				createClusterSetupHAFMPropertyFile(cluster)
+				createConfigCommonPropertyFile(cluster)
+				copyReleaseIso(cluster)
+					
+
+
+从指定主机的ReleaseIsoPath目录拷贝FI集群镜像文件到远程的每个节点的FMHomeRemote目录下；
+				createPatchToolConfIni(cluster)
+					
+由于补丁工具配置文件跟日志收集配置文件是相同的，只需将日志收集目录/collect_log下的
+cluster.ini文件拷贝到补丁工具指定的目录下（/Patch_tools_*/03.InstallorUninstall/cluster/）；
+				创建执行测试用例需要的配置文件
+					在CI主机指定目录（每个目录会以客户端节点ip名作为后缀来保证唯一性）下创建一个与clustersetup_ha_FM.properties同名
+的空文件，将要配置的配置项赋值后与剩下的配置项一行一行地写到空文件中，最后把这个文件拷贝每个客户端节点的指定目录下；
+					在CI主机指定目录（每个目录会以客户端节点ip名作为后缀来保证唯一性）下创建一个与config_common.properties同名
+的空文件，将要配置的配置项赋值后与剩下的配置项一行一行地写到空文件中，最后把这个文件拷贝每个客户端节点的指定目录下；
+			ClusterOperationFMMulti.java
+			（FI多集群）
+				参考FI单集群，需要注意的是，FI多集群中每个集群有两个客户端，要创建两个配置文建并拷贝配置文件分别给两个客户端节点；
+			ClusterOperationANT.java
+			（ANT集群）
+				createPropertyFile(cluster)
+					参考FI单集群；
+				createConfigCommonPropertyFile(cluster)
+					参考FI单集群；
+				注：安装ANT集群不需要镜像文件，不需要安装Patch补丁包，跑测试用只需要config_common.properties这一个文件；
+10，new InstallCluster().execute()
+	创建clusterListTotalNum数的线程安装相同数量的集群
+new RunInstallCluster(i)
+		installCluster(cluster)
+三种集群对应三种实现
+			ClusterOperationFMSingle.java
+			（FI单集群）
+				
+(1) 登录客户端节点，执行FMHomeRemote目录下的start.sh脚本开始安装集群；
+				(2) 调用checkClusterHealth(cluster)方法检查集群是否安装成功；
+				(3) 若集群安装成功，使用ant脚本ant -f runJava.xml ClusterRestart -Doperation='stop' 调用
+DataSightBasePlatform_TestCode_HQ模块中ClusterRestart类的restartCluster(...)方法停止集群；
+				(4) 集群停止后，安装Patch补丁包到集群和客户端;
+集群版本不同，安装的Patch补丁包也不同；
+					C60版本FI集群
+						
+(1) 执行InstallAllPatch.sh脚本安装Patch补丁包到集群，执行DistributeCheckFiles.sh脚本检查Patch补丁是否成功安装到集群；
+						(2) 使用ant脚本ant -f runJava.xml ClusterRestart -Doperation='start' 调用DataSightBasePlatform_TestCode_HQ
+模块中ClusterRestart类的restartCluster(...)方法启动集群；
+						(3) 集群启动后，执行InstallClient.sh脚本安装Patch补丁包到客户端，然后执行CheckClient.sh脚本检查Patch补丁是否成功安装到客户端；
+						(4) 若以上都执行成功，installCluster(cluster)方法返回true，否则返回false；
+					C70版本FI集群
+						
+(1) 执行InstallAllPatch.sh1.5脚本安装1.5版本Patch补丁包到集群，执行DistributeCheckFiles.sh1.5脚本检查Patch补丁是否成功安装到集群；
+						(2) 若1.5版本Patch安装成功， 执行InstallAllPatch.sh2.1脚本安装2.1版本Patch补丁包到集群，执行DistributeCheckFiles.sh2.1脚本检查Patch补丁是否成功安装到集群;
+						(3) 使用ant脚本ant -f runJava.xml ClusterRestart -Doperation='start' 调用DataSightBasePlatform_TestCode_HQ
+模块中ClusterRestart类的restartCluster(...)方法启动集群；
+						(4) 集群启动后，执行InstallClient.sh脚本安装1.5版本Patch补丁包到客户端，然后执行CheckClient.sh脚本检查Patch补丁是否成功安装到客户端；
+						(5) 若1.5版本Patch安装成功，执行InstallClient.sh脚本安装2.1版本Patch补丁包到客户端，然后执行CheckClient.sh脚本检查Patch补丁是否成功安装到客户端；
+						(6) 若以上都执行成功，installCluster(cluster)方法返回true，否则返回false；
+				(5) 若集群安装成功，调用方法runGetPutFile()从客户端节点获取DataSightBasePlatform_TestCode_HQ测试代码工程运行需要的cconf文件和jar包；
+若集群安装失败，会重新安装，在Jenkins中通过RETRY.REINSTALL.MAX.TIME配置项控制重装次数；
+			ClusterOperationFMMulti.java
+			（FI多集群）
+				
+参考FI单集群的步骤(1)；
+不同的是，多集群安装时每个集群其实是装了两套集群；
+			ClusterOperationANT.java
+			（ANT集群）
+				
+(1) 登录集群的客户端节点依次执行以下ant命令：
+ant -f remote_ha.xml——>安装ANT集群；
+ant -f remote_ha.xml install.client——>安装客户端；
+ant -f remote_ha.xml startup.cluster——>启动集群；
+(2) 检查集群是否安装成功；
+checkClusterHealth(cluster)——>checkNode(...)
+(3) 接下来的运行流程参考FI单集群中的步骤(5)；
+11，MonitorEnvState.startMonitor()
+	(1) 通过nmon工具和top命令监控节点环境状况(例如CPU、内存等)，nmon工具的安装在ant脚本CI_env_setup.xml中实现；
+	(2) 调用startMonitor()方法后，会启用与占用节点数（occupyNodeList）相等的线程，在所有占用节点上执行nmon命令监控节点CPU占用率、内存占用率等，
+同样也执行top命令监控进程状况，最终两者都会以指定的时间间隔搜集一定次数的监控信息，并将这些信息不断追加到指定的文件中；
+12，new ExecuteTestCase().execute()
+	(1) 创建topoList.size()个线程，来给每个topo分配
+测试用例——>new RunDispatcher(topo)
+		dispatcher.dispatch()
+			new TestTask()
+				(1) 将每个clusterTopo对应的测试用例testCases循环一一取出；
+同时，从步骤5中put值后的clusterLinkedBlockingQueue中take()得到clusterTopo中的一个集群，并得到集群的管理节点ip；
+把取出的测试用例分配给这个管理节点，调用execCommand.exec(buildCommand())执行测试用例；
+				(2) 执行每个测试用例会有一个超时时间CI_ONE_TEST_CASE_TIMEOUT_SECONDS，如果执行某个测试用例超过了这个时间，
+就把这个测试用例重新添加到数组testCases中（ clusterTopo.testCases.add(testCase)）重跑；
+				(3) 如果某个节点在跑测试用例时，出现了IOException，这个节点将不会再被使用，这个测试用例会重新添加到testCases
+中分配给其他集群重跑；
+		dispatcherTestClass.dispatch()
+			
+参考上面dispatcher.dispatch()；
+	
+(2) 如果在Jenkin中配置了determineCaseFileName
+(就是可以指定要跑某个suite文件中的某个或多个测试用例)
+		
+在Jenkins中配置ant命令：ant -f runJava.xml createSuiteFileForDetermineCase -DdetermineCaseFilePath=$DetermineCaseFileTopo1
+调用类GenerateSuiteFromDetermineCaseFile创建一个suite文件，来存放指定要跑的测试用例，把这个suite文件放到测试代码工程中
+一起编译，最后跟同样是跟其他测试用例分配给集群；
+13，MonitorEnvState.killMonitor()
+	在所有测试用例都跑完之后，停止监控节点，使用kill命令杀掉nmon进程和top进程；
+14，CollectMonitorResult.execute()
+	启用与占用节点数（occupyNodeList）相等的线程，将所有占用节点中监控信息文件拷贝到CI机器的指定目录下，
+为了使存放监控信息的文件与每个节点一一对应，在拷贝时会给每个文件的文件名加上其对应节点的IP名；
+代码实现：CollectMonitorResult.java类——>方法multiThreadScpGet(...)——>new getFromRemote(...)——>scp.getFile(..)
+15，CollectTestResult.execute()
+	在Dispatcher类中，跑完测试用例会对test结果作判断：
+result = new SingleTestResult()——>execCommand.exec(buildCommand())
+		测试用例跑成功
+			(1) buildCommand()方法中，用ant脚本通过junit将测试结果写到指定的xml格式的文件中;
+			(2) 创建客户端节点个数的线程，将测试报告文件重命名、zip压缩，拷贝到CI机器指定目录
+下（/TestResult/TestReport/），最后解压、删除压缩包文件；
+		测试用例没跑成功
+（failed或error）
+			调用方法dumpLog(ip)，将失败用例的测试结果文件拷贝到CI机器指定目录下（/TestResult/TestReportFailed/）;
+16，new CollectClusterLogConf().execute()
+	创建clusterListTotalNum个数的线程搜集日志文件
+new RunCollectClusterLogConf(i)
+		collectClusterLogConf(cluster)
+			ClusterOperationFMSingle.java
+			（FI单集群）
+				(1) 执行脚本get_all.sh 搜集所有日志信息（clusterConf、clusterLog、containerlogs、hdfsmeta等）；
+				(2) 将存放日志信息的文件重新命名以.zip结尾；
+				(3)将远程客户端节点上的日志文件全部拷贝到本地CI机器的指定目录下，拷贝时会给每个日志文件的名称追加对应的客户端ip后缀；
+			ClusterOperationFMMulti.java
+			（FI多集群）
+				同FI单集群；
+			ClusterOperationANT.java
+			（ANT集群）
+				(1) 执行ant脚本搜集所有日志信息；
+				(2) 将存放日志信息的文件重新命名以.zip结尾;
+				(3) 将远程客户端节点上的日志文件全部拷贝到本地CI机器的指定目录下,拷贝时会给每个日志文件的名称追加对应的客户端ip后缀；
+在Jenkins页面触发构建，完成配置、拷贝集群安装包、编译工程等任务后，
+执行命令ant -f DataSightBasePlatform_build.xml runMain最终调用了
+Runmain类main函数中的方法run_all()，这个地方是自动化框架的主入口。
