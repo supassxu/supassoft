@@ -162,4 +162,103 @@ IBO （Input/Behavior/Output）
 测试需求与需求跟踪
 测试（分析）设计实际问题讨论
 
+测试方案设计：质量因子
+外部和内部质量！
+功能性（合适性、精确性、互操作性、安全性、功能顺从性）
+可靠性（成熟性、容错性、可恢复性、可靠顺从性）
+可用性（可理解性、可学习性、可操作性、吸引性、可用顺从性）
+效率性（时间行为、资源利用、效率顺从性）
+可维护性（可分析性、可变化性、稳定性、可测试性、维护顺从性）
+可移植性（可适应性、可安装性、共存性、可替代性、移植顺从性）
+
+测试类型
+功能测试
+性能/指标测试
+安全性测试
+协议一致性测试
+压力测试
+可恢复性测试
+可安装性测试
+配置测试
+可靠性测试
+兼容性测试
+选型测试
+国际化标准测试
+可维护性测试
+可用性测试
+
+测试类型（Test Type）：							
+  功能测试、性能测试、一致性测试、安全性测试….							
+							
+测试阶段（Test Stage/Level）：							
+  1、单元测试、集成测试、系统测试、验收测试							
+  2、BBIT、MIT、MST、SDV、SIT、SVT、BETA							
+							
+测试活动（Test Activity）:							
+  测试计划（Test Plan）、测试设计（Test Design）、测试实现（Test Implementation）、测试执行（Test Execution）、测试评估（Test Evaluation）							
+							
+							
+							
+质量特性（Quality Charactics）：							
+  功能性（Functinality）、可靠性（Reliability）、可用性（Useability）、效率性（Efficency）、可维护性（Maintainability）、可移植性（Portability）							
+							
+							
+							
+测试方法（Test Method）：							
+  1、从是否针对系统的内部结构和具体实现算法的角度：							
+     白盒测试（White-Box Test）、黑盒测试（Black-Box Test）、灰盒测试（Gray-Box Test）							
+							
+  2、从是否需要执行被测软件的角度：							
+     静态测试（Static Test）、动态测试（Dynamic Test）							
+  3、从是否需要人工测试的角度：							
+     手工测试（Manual Test）、自动测试（Automated Test）							
+							
+测试技术（Test Techniques）：							
+  Band Delphi Method							
+  Basis Path Testing							
+  Boundary Value Testing							
+  ……	
+  
+这里所列出的测试类型是一些基本的、常用的测试类型，各个产品领域都适用，且必须进行该类型的测试，但具体的测试方法可能会有所不同。
+功能测试（Fuction Test）（测试系统提供的功能是否能够正确、完全满足用户需要。）
+一致性测试（Conformance Test）（测试系统是否符合相关的协议、标准）
+安全性测试（Security Test）（测试软件产品保护信息和数据的能力，如非法用户或系统不能阅读和修改信息和数据，合法用户或系统不会被拒绝访问，以保证数据的保密性和完整性。
+测试设计时要考虑以下四个安全组件：asset、threat、exposure、control。）
+性能测试（Performance Test）（性能测试针对系统是否达到其规定的性能需求，如容量和响应时间。）
+压力测试（Stress Test）（压力测试通过使系统达到或超过其设计的最大负荷来检验其在非正常状态下的特性。）
+配置测试（Configuration Test）（在配置测试时系统应该是为不同用户服务而设计的，测试是分析系统在各种各样的特定配置下的表现。）
+安装测试（Installation Test）（在系统开发完成和接受测试执行后，系统要在目标环境下测试安装，也就是根据硬件配置需求进行系统测试。同样要检验安装的步骤。）
+恢复测试（Recovery Test）（测试系统从硬件或软件故障中恢复的能力。
+测试设计时需要考虑以下问题： 
+1、Have the potentials for disasters and system failures been identified,and their respective damages? Fire drill brainstorming(头脑风暴) sessions can be an effective method of defining disaster scenarios. 
+2、Do the prevention and recovery procedures provided for adequate responses to failures? The plan procedures should be tested with technical reviews by subject matter experts and the system users. 
+3、Will the recovery procedures work properly when really needed? Simulated disasters need to be created with the actual system verifying the recovery procedures. This should involve the system users,the support orginazation,vendors,etc.）
+
+这里所列出的测试类型是推荐的一些可选的测试类型，根据不同产品领域的特点和不同的产品需求进行灵活选择。
+大容量测试（Volume Test）（测试系统在是否能处理大容量的数据。）
+兼容性测试（对不同操作系统、不同硬件平台的兼容性）
+互操作性测试（Interoperability Test）（与其他厂家相关产品的对接/互通测试）
+数据库测试(Database Test)（测试数据库的完整性、访问、刷新能力等）
+备份测试（Backup Test）（测试系统在软件或硬件故障时备份数据的能力。
+备份测试可能包括：
+Backup files and comparing the backup with the original
+Archiving files and data
+Complete system backup procedures
+Checkpoint backups
+Backup performance system degradation
+Effect of backup on manaual processes
+Detection of triggers to backup system
+Security procedures during backup
+Maintaining transaction logs during backup procedures
+）
+转换测试（Conversion Test）（测试当前数据的转换，以及新数据库的加载。
+测试设计时主要考虑以下几个方面：
+Auditability
+Database Verification
+Data Cleanup
+Recovery Plan
+Synchronization
+）
+中间件测试(Middleware Test)（测试中间件是否正常工作。）
+
 
