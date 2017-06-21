@@ -1,17 +1,49 @@
-1	打公共jar包徐婷君修改部分冲突
-2	开发mergerequest CI代码合入到主库测试
-3	Flink测试工程上maven
-4	测试公共jar包源码包上传至maven中央库
-5	接手CIE的工作，定位CI跑失败的问题
-6	新建jenkins工程，清理配置文件CI环境
-7	新建jenkins工程，反馈当前CI机器使用情况
-8	接手carbon对接spark2.0（武钰杰）
+序号	任务	任务分解
+1	打公共jar包徐婷君修改部分冲突	"理清冲突的情况；
+针对2/3个jdbc实例的情况进行从数据库中获取内容兼容两者；
+进行本地和CI的测试；
+代码合入到测试主库"
+2	开发mergerequest CI代码合入到主库测试	"fork最新的测试C30代码到个人库；
+往个人库中添加调试测试拆分需要的文件；
+测试调整之后的工程；（包含本地和CI）
+个人库代码提交mergerequest上测试主库"
+3	Flink测试工程上maven	"1.编写Flink子工程的pom文件
+2.第三方依赖包上测试中央库
+3.本地调试通过
+4.CI调试通过
+5.代码上测试代码库"
+4	测试公共jar包源码包上传至maven中央库	寻找打source jar报的方法，打包并上传source jar包至测试中央库
+5	接手CIE的工作，定位CI跑失败的问题	具体定位当前C30全量工程报错问题
+6	新建jenkins工程，清理配置文件CI环境	"CI组新建工程
+配置CI工程"
+7	新建jenkins工程，反馈当前CI机器使用情况	陈柯正在处理
+8	接手carbon对接spark2.0（武钰杰）	了解carbon对接spark2.0工程的业务了解，xml的讲解
 9	"http://100.106.75.10:8080/jenkins/view/SmokeTest/job/V100R002C30SPC100_HQ_Spark1.5_SmokeTest/
-http://100.106.75.6:8080/jenkins/view/Test_Team/job/DataSight_V100R002C30SPC100_HQ_Spark2.1_SmokeTest/"
+http://100.106.75.6:8080/jenkins/view/Test_Team/job/DataSight_V100R002C30SPC100_HQ_Spark2.1_SmokeTest/"	工程关联开发MR工程，跑起来
 10	"出来开发提的issue
-http://code.huawei.com/datasight/datasightDashboard/issues/18"
-11	提问题单，修改各开发库里面的测试库代码
-12	测试工程提交Merge Request自动触发触发Merge Request CI工程
-13	印度测试提的http://code.huawei.com/datasight/datasightDashboard/issues/17新增capacity schedule调度接口
-14	统计只能跑FI的用例
-15  
+http://code.huawei.com/datasight/datasightDashboard/issues/18"	添加kafka重启接口
+11	提问题单，修改各开发库里面的测试库代码	"1.提问题单
+2.合入代码
+3.找开发合入"
+12	测试工程提交Merge Request自动触发触发Merge Request CI工程	工程已经提交
+13	印度测试提的http://code.huawei.com/datasight/datasightDashboard/issues/17新增capacity schedule调度接口	徐超超、陈柯、何其一起完成superior接口到capacity接口的调试和测试，目前已经完成
+14	统计只能跑FI的用例	对当前git库当中的用例进行分类，找出只能在FI上跑的用例
+15	开发库免getputfile编译通过，pom文件添加getputfile产生jar包依赖	手动去中央库找依赖包添加到pom文件中
+16	util jar包包含capacity这一块	
+17	Flink CI机器扩容	添加好CI机器的/etc/hosts
+18	除了印度测试提的issue，开发新需求	针对没一点需求跟印度测试对齐，然后分析该需求，找到现在已有的和需要自己重新开发的部分
+19	flink分支修改ant脚本需求	"ANT安装Flink时拷贝flink-connector到对应的路径
+安装ANT的时候： 1.把版本包路径下的DataSight_Stream_V100R002C50RC2B010_FlinkConnectors_*.tar.gz解压,把里面的jar包拷贝到CI工程的 DataSightBasePlatform_lib/Others/Flink以及客户端flink/lib下 2.将客户端kafka/libs下的kafka-clients-0.10.0.0.jar拷贝到DataSightBasePlatform_lib/Others/Flink以及客户端flink/lib下
+Edited 2017-06-05 09:16:53"
+20	sparkjdbc串行启动过程整改	"1.分析原先并行的逻辑结构
+2.找出穿行的逻辑思路并实施
+"
+21	postbuild中的环境清理也通过DataSightBasePlatform_Schedule实现	"1.分析清楚原先的环境清理机制以及现在需求；
+2.找到与当前需求相类似的已经实现的需求;
+3.单独执行runmain里面的一个方法，即一个类，传给他必要的参数"
+22	getputfile中krbserver获取conf文件中使用的ip为nodemanager修改为KerberosServer	通读使用该方法的前置和后置条件
+23	getpufile获取jar包新增获取不同路径jar包	"1.理解之前获取jar包的方式；
+2.分析当前获取jar报需求，并设计方案（尽量利用之前的获取jar包方式）；
+3.实现该方法，并且在本地和CI进行测试"
+24	印度测试对于安装集群修改配置的需求测试	
+25	印度测试对于安装集群添加实例、修改配置的需求实现	
