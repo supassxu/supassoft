@@ -1,0 +1,4 @@
+激活office2013的命令（先进入到office所在的目录“D:\Program Files\Microsoft Office\Office15”分3步按照顺序执行下面的命令）
+Cscript ospp.vbs /inpkey:YC7DK-G2NP3-2QQC3-J6H88-GVGXT
+cscript ospp.vbs /sethst:szxkms03-nt.huawei.com
+cscript ospp.vbs /act
